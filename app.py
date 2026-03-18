@@ -51,17 +51,47 @@ if uploaded_file is None:
 file_name = uploaded_file.name
 
 if file_name.endswith(".pdf"):
-    df = parse_paytm_pdf(uploaded_file)
+    try:
+        df = parse_paytm_pdf(uploaded_file)
+    except Exception as e:
+        st.error(
+            "❌ Could not parse this PDF. "
+            "Please make sure it is a Paytm statement. "
+            "For other banks please upload Excel format."
+        )
+        st.stop()
 
 elif file_name.endswith(".xlsx") or file_name.endswith(".xls"):
-    df = parse_excel(uploaded_file)
-    df = clean_excel_data(df)
-    st.success(f"Successfully parsed {len(df)} transactions!")
+    try:
+        df = parse_excel(uploaded_file)
+        df = clean_excel_data(df)
+        st.success(f"Successfully parsed {len(df)} transactions!")
+    except Exception as e:
+        st.error(
+            "❌ Could not parse this Excel file. "
+            "Please make sure it is a valid bank statement."
+        )
+        st.stop()
 
 else:
     st.error(
-        "Unsupported file format. "
+        "❌ Unsupported file format. "
         "Please upload a PDF or Excel file."
+    )
+    st.stop()
+
+if df.empty:
+    st.warning(
+        "⚠️ No transactions found in this file. "
+        "Please check if you uploaded the correct statement."
+    )
+    st.stop()
+
+if "Amount" not in df.columns:
+    st.warning(
+        "⚠️ Could not detect Amount column. "
+        "Please DM us on Instagram @nitinbuilds.official "
+        "with your bank name and we will add support within 48 hours."
     )
     st.stop()
 
