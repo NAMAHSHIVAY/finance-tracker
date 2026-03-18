@@ -30,18 +30,36 @@ def merge_debit_credit(df):
     deposit_col = None
 
     for col in df.columns:
-        if "withdrawal" in str(col).lower():
+        col_lower = str(col).lower()
+        if any(word in col_lower for word in [
+            "withdrawal", "debit", "dr"
+        ]):
             withdrawal_col = col
-        if "deposit" in str(col).lower():
+        if any(word in col_lower for word in [
+            "deposit", "credit", "cr"
+        ]):
             deposit_col = col
 
     if withdrawal_col is None or deposit_col is None:
         return df
 
+    def safe_amount(val):
+        if pd.isna(val):
+            return 0
+        cleaned = str(val).replace(",", "").replace(
+            " ", ""
+        ).strip()
+        if cleaned in ["-", "", "None", "nan"]:
+            return 0
+        try:
+            return float(cleaned)
+        except:
+            return 0
+
     df["Amount"] = df.apply(
-        lambda row: -clean_amount(row[withdrawal_col])
-        if clean_amount(row[withdrawal_col]) != 0
-        else clean_amount(row[deposit_col]),
+        lambda row: safe_amount(row[deposit_col])
+        if safe_amount(row[deposit_col]) != 0
+        else -safe_amount(row[withdrawal_col]),
         axis=1
     )
 
@@ -77,6 +95,14 @@ def clean_excel_data(df):
     # Reset index
     df = df.reset_index(drop=True)
 
+    # Remove opening balance or summary rows
+    df = df[~df.iloc[:, 0].astype(str).str.contains(
+        "opening|closing|balance b/f|balance c/f"
+        "|brought forward|carried forward",
+        case=False, na=False
+    )]
+    df = df.reset_index(drop=True)
+
     # Clean column names
     df.columns = [
         str(col).strip().replace("\n", " ")
@@ -96,11 +122,14 @@ def clean_excel_data(df):
 
     # Detect BOB style
     col_names_lower = [col.lower() for col in df.columns]
+
     has_withdrawal = any(
-        "withdrawal" in col for col in col_names_lower
+        any(word in col for word in ["withdrawal", "debit", "dr"])
+        for col in col_names_lower
     )
     has_deposit = any(
-        "deposit" in col for col in col_names_lower
+        any(word in col for word in ["deposit", "credit", "cr"])
+        for col in col_names_lower
     )
 
     if has_withdrawal and has_deposit:

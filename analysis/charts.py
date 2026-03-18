@@ -7,9 +7,20 @@ def parse_date(date_str):
     import re
     date_str = str(date_str).strip()
 
-    # Try standard formats first
-    for fmt in ["%d/%m/%Y", "%d-%m-%Y",
-                "%Y-%m-%d", "%d %b %Y"]:
+    # Handle already parsed datetime objects
+    if "00:00:00" in date_str:
+        try:
+            return pd.to_datetime(date_str)
+        except:
+            pass
+
+    # Try standard formats
+    for fmt in [
+        "%d/%m/%Y", "%d-%m-%Y",
+        "%Y-%m-%d", "%d %b %Y",
+        "%Y-%m-%d %H:%M:%S",
+        "%d/%m/%Y %H:%M:%S"
+    ]:
         try:
             return pd.to_datetime(date_str, format=fmt)
         except:
@@ -32,6 +43,12 @@ def parse_date(date_str):
             )
         except:
             pass
+
+    # Last resort — let pandas figure it out
+    try:
+        return pd.to_datetime(date_str, infer_datetime_format=True)
+    except:
+        pass
 
     return pd.NaT
 

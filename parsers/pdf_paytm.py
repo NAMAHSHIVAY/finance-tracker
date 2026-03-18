@@ -8,11 +8,37 @@ def parse_paytm_pdf(file):
 
     # Extract all text from every page
     all_text = ""
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                all_text += text + "\n"
+
+    # Try opening without password first
+    try:
+        with pdfplumber.open(file) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    all_text += text + "\n"
+
+    except Exception as e:
+        st.warning("🔒 This PDF appears to be password protected.")
+        password = st.text_input(
+            "Enter PDF password to continue:",
+            type="password"
+        )
+        if not password:
+            st.info(
+                "Enter the password above or upload "
+                "a non-password protected version."
+            )
+            return pd.DataFrame()
+
+        try:
+            with pdfplumber.open(file, password=password) as pdf:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if text:
+                        all_text += text + "\n"
+        except:
+            st.error("❌ Incorrect password. Please try again.")
+            return pd.DataFrame()
 
     transactions = []
 
