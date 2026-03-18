@@ -40,6 +40,11 @@ st.caption(
     "🔜 Coming soon: PhonePe, GPay PDFs"
 )
 
+st.caption(
+    "🔒 Privacy: Your data is processed in memory only. "
+    "Nothing is stored or saved anywhere."
+)
+
 if uploaded_file is None:
     st.info("👆 Upload your bank statement above to get started.")
     st.stop()
