@@ -31,7 +31,14 @@ def categorise_transaction(narration, amount, tags=None):
     if any(word in narration for word in [
         "zomato", "swiggy", "food", "restaurant",
         "cafe", "hotel", "kitchen", "bakery",
-        "dairy", "sweet", "dhaba"
+        "dairy", "sweet", "dhaba", "burger",
+        "pizza", "chicken", "biryani", "roll",
+        "sandwich", "juice", "chai", "tea",
+        "egg", "snack", "canteen", "tiffin",
+        "mess", "thali", "paratha", "dosa",
+        "idli", "chaat", "pani puri", "lassi",
+        "mithai", "halwa", "pav", "vada",
+        "corner", "stall", "eatery", "cuisine"
     ]):
         return "Food"
 

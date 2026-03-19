@@ -4,6 +4,7 @@ import pdfplumber
 from parsers.excel_parser import parse_excel
 from parsers.pdf_paytm import parse_paytm_pdf
 from parsers.pdf_gpay import parse_gpay_pdf
+from parsers.pdf_phonepe import parse_phonepe_pdf
 from processors.cleaner import clean_excel_data
 from processors.categoriser import add_categories
 from analysis.charts import show_analysis
@@ -39,8 +40,8 @@ uploaded_file = st.file_uploader(
 )
 
 st.caption(
-    "✅ Supported: Paytm PDF, GPay PDF, All bank Excel files | "
-    "🔜 Coming soon: PhonePe PDF"
+    "✅ Supported: Paytm PDF, GPay PDF, PhonePe PDF, "
+    "All bank Excel files"
 )
 
 st.caption(
@@ -118,6 +119,8 @@ if file_name.endswith(".pdf"):
             df = parse_gpay_pdf(io.BytesIO(file_bytes))
         elif pdf_type == "paytm":
             df = parse_paytm_pdf(io.BytesIO(file_bytes))
+        elif pdf_type == "phonepe":
+            df = parse_phonepe_pdf(io.BytesIO(file_bytes))
         else:
             st.warning(
                 "⚠️ Could not detect PDF type automatically. "
