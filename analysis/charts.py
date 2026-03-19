@@ -52,8 +52,73 @@ def parse_date(date_str):
 
     return pd.NaT
 
+def show_category_trends(expense_df, amount_col, date_col):
+    st.markdown("### 📊 Category Spending Trends")
+    st.caption("See how your spending in each category changes week by week.")
 
-def show_analysis(df):
+    # Parse dates
+    trend_df = expense_df.copy()
+    trend_df[date_col] = trend_df[date_col].apply(parse_date)
+    trend_df = trend_df.dropna(subset=[date_col])
+
+    if trend_df.empty:
+        st.warning("Not enough date data for trends.")
+        return
+
+    # Add week column
+    trend_df["Week"] = trend_df[date_col].dt.to_period("W").apply(
+        lambda r: r.start_time
+    )
+
+    # Group by week and category
+    weekly = trend_df.groupby(
+        ["Week", "Category"]
+    )[amount_col].sum().abs().reset_index()
+    weekly.columns = ["Week", "Category", "Amount"]
+
+    # Only show top 5 categories by total spend
+    # Too many lines makes chart unreadable
+    top_categories = weekly.groupby(
+        "Category"
+    )["Amount"].sum().nlargest(5).index.tolist()
+
+    weekly = weekly[weekly["Category"].isin(top_categories)]
+
+    fig_trend = px.line(
+        weekly,
+        x="Week",
+        y="Amount",
+        color="Category",
+        markers=True,
+        labels={
+            "Week": "Week",
+            "Amount": "Amount Spent (₹)",
+            "Category": "Category"
+        }
+    )
+    fig_trend.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="white",
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.05,
+            font=dict(size=13)
+        ),
+        margin=dict(t=40, b=40, l=40, r=200),
+        hoverlabel=dict(
+            bgcolor="rgba(0,0,0,0.8)",
+            font_size=14
+        ),
+        hovermode="x unified"
+    )
+    fig_trend.update_traces(line=dict(width=2))
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+def show_analysis(df, budget=0):
 
     # ── Find amount column ──
     amount_col = None
@@ -71,36 +136,51 @@ def show_analysis(df):
         df[amount_col], errors="coerce"
     ).fillna(0)
 
-    # ── Split income and expenses ──
-    income_df = df[df[amount_col] > 0]
+    # ── Only look at expenses — ignore all incoming ──
     expense_df = df[df[amount_col] < 0]
-
-    total_income = income_df[amount_col].sum()
     total_spent = abs(expense_df[amount_col].sum())
-    net_savings = total_income - total_spent
+
+    # Budget calculations
+    if budget > 0:
+        budget_remaining = budget - total_spent
+        budget_used_pct = (total_spent / budget * 100)
 
     # ── Section 1 — Summary Cards ──
     st.markdown("### 💡 Summary")
-    col1, col2, col3 = st.columns(3)
 
-    with col1:
-        st.metric(
-            label="Total Income",
-            value=f"₹{total_income:,.2f}"
-        )
-    with col2:
-        st.metric(
-            label="Total Spent",
-            value=f"₹{total_spent:,.2f}"
-        )
-    with col3:
-        st.metric(
-            label="Net Savings",
-            value=f"₹{net_savings:,.2f}",
-            delta=f"{'Saved' if net_savings > 0 else 'Overspent'}"
-        )
-
-    st.markdown("---")
+    if budget > 0:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                label="Monthly Budget",
+                value=f"₹{budget:,.0f}"
+            )
+        with col2:
+            st.metric(
+                label="Total Spent",
+                value=f"₹{total_spent:,.2f}",
+                delta=f"{budget_used_pct:.1f}% of budget used",
+                delta_color="inverse"
+            )
+        with col3:
+            st.metric(
+                label="Budget Remaining",
+                value=f"₹{budget_remaining:,.2f}",
+                delta=f"{'On track' if budget_remaining > 0 else 'Over budget'}",
+                delta_color="normal" if budget_remaining > 0 else "inverse"
+            )
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric(
+                label="Total Spent",
+                value=f"₹{total_spent:,.2f}"
+            )
+        with col2:
+            st.metric(
+                label="Transactions",
+                value=f"{len(expense_df)}"
+            )
 
     # ── Section 2 — Spending by Category ──
     st.markdown("### 📊 Spending by Category")
@@ -114,16 +194,24 @@ def show_analysis(df):
         "Amount", ascending=False
     )
 
+    # Add percentage to category names for legend
+    total = category_df["Amount"].sum()
+    category_df["Label"] = category_df.apply(
+        lambda row: f"{row['Category']} ({row['Amount']/total*100:.1f}%)",
+        axis=1
+    )
+
     fig_pie = px.pie(
         category_df,
         values="Amount",
-        names="Category",
+        names="Label",
         hole=0.4
     )
     fig_pie.update_traces(
-        textposition="outside",
-        textinfo="percent+label",
-        pull=[0.05] * len(category_df)
+        textposition="inside",
+        textinfo="percent",
+        pull=[0.05] * len(category_df),
+        insidetextfont=dict(size=10)
     )
     fig_pie.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
@@ -135,9 +223,10 @@ def show_analysis(df):
             yanchor="middle",
             y=0.5,
             xanchor="left",
-            x=1.1
+            x=1.05,
+            font=dict(size=14)
         ),
-        margin=dict(t=40, b=40, l=40, r=160),
+        margin=dict(t=40, b=40, l=40, r=200),
         hoverlabel=dict(
             bgcolor="rgba(0,0,0,0.8)",
             font_size=14
@@ -183,7 +272,14 @@ def show_analysis(df):
 
     st.markdown("---")
 
-    # ── Section 4 — Top 10 Transactions ──
+    st.markdown("---")
+
+    # ── Section 4 — Category Trends ──
+    if date_col and "Category" in expense_df.columns:
+        show_category_trends(expense_df, amount_col, date_col)
+        st.markdown("---")
+
+    # ── Section 5 — Top 10 Transactions ──
     st.markdown("### 🔺 Top 10 Transactions")
 
     top10 = expense_df.nsmallest(
@@ -194,6 +290,13 @@ def show_analysis(df):
         )[[amount_col, "Category"]]
 
     top10[amount_col] = top10[amount_col].abs()
+
+    # Clean date format for display
+    if date_col in top10.columns:
+        top10[date_col] = pd.to_datetime(
+            top10[date_col], errors="coerce"
+        ).dt.strftime("%d %b %Y")
+
     top10.columns = [
         col.replace(amount_col, "Amount")
         for col in top10.columns

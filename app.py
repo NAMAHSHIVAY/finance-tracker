@@ -45,6 +45,30 @@ st.caption(
     "Nothing is stored or saved anywhere."
 )
 
+# ─────────────────────────────────────────
+# BUDGET INPUT
+# ─────────────────────────────────────────
+
+st.markdown("### 💰 Monthly Budget(Optional)")
+col_sal1, col_sal2 = st.columns([2, 1])
+
+with col_sal1:
+    budget = st.number_input(
+        "Set your monthly spending budget (optional)",
+        min_value=0,
+        value=0,
+        step=1000,
+        help="Set how much you plan to spend this month. "
+             "We will show how much you have used."
+    )
+
+with col_sal2:
+    budget_label = st.empty()
+    if budget > 0:
+        budget_label.success(f"✅ Budget set: ₹{budget:,.0f}/month")
+
+st.markdown("---")
+
 if uploaded_file is None:
     st.info("👆 Upload your bank statement above to get started.")
     st.stop()
@@ -120,4 +144,4 @@ with st.expander("📋 View Raw Transaction Data"):
 # ANALYSIS
 # ─────────────────────────────────────────
 
-show_analysis(df)
+show_analysis(df, budget)
