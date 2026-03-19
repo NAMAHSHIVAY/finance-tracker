@@ -1,6 +1,9 @@
 import streamlit as st
+import io
+import pdfplumber
 from parsers.excel_parser import parse_excel
 from parsers.pdf_paytm import parse_paytm_pdf
+from parsers.pdf_gpay import parse_gpay_pdf
 from processors.cleaner import clean_excel_data
 from processors.categoriser import add_categories
 from analysis.charts import show_analysis
@@ -36,8 +39,8 @@ uploaded_file = st.file_uploader(
 )
 
 st.caption(
-    "✅ Supported: Paytm PDF, All bank Excel files | "
-    "🔜 Coming soon: PhonePe, GPay PDFs"
+    "✅ Supported: Paytm PDF, GPay PDF, All bank Excel files | "
+    "🔜 Coming soon: PhonePe PDF"
 )
 
 st.caption(
@@ -49,7 +52,7 @@ st.caption(
 # BUDGET INPUT
 # ─────────────────────────────────────────
 
-st.markdown("### 💰 Monthly Budget(Optional)")
+st.markdown("### 💰 Monthly Budget (Optional)")
 col_sal1, col_sal2 = st.columns([2, 1])
 
 with col_sal1:
@@ -81,11 +84,51 @@ file_name = uploaded_file.name
 
 if file_name.endswith(".pdf"):
     try:
-        df = parse_paytm_pdf(uploaded_file)
+        # Read file bytes once
+        file_bytes = uploaded_file.read()
+
+        # Detect PDF type by filename first then content
+        pdf_type = "unknown"
+        file_name_lower = file_name.lower()
+
+        if "gpay" in file_name_lower or "google" in file_name_lower:
+            pdf_type = "gpay"
+        elif "paytm" in file_name_lower:
+            pdf_type = "paytm"
+        elif "phonepe" in file_name_lower or "phone_pe" in file_name_lower:
+            pdf_type = "phonepe"
+        else:
+            # Fall back to content detection
+            try:
+                with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                    first_page = pdf.pages[0].extract_text()
+                    if first_page:
+                        first_page_lower = first_page.lower()
+                        if "google" in first_page_lower:
+                            pdf_type = "gpay"
+                        elif "paytm" in first_page_lower:
+                            pdf_type = "paytm"
+                        elif "phonepe" in first_page_lower:
+                            pdf_type = "phonepe"
+            except:
+                pass
+
+        # Parse using correct parser
+        if pdf_type == "gpay":
+            df = parse_gpay_pdf(io.BytesIO(file_bytes))
+        elif pdf_type == "paytm":
+            df = parse_paytm_pdf(io.BytesIO(file_bytes))
+        else:
+            st.warning(
+                "⚠️ Could not detect PDF type automatically. "
+                "Trying Paytm format..."
+            )
+            df = parse_paytm_pdf(io.BytesIO(file_bytes))
+
     except Exception as e:
         st.error(
             "❌ Could not parse this PDF. "
-            "Please make sure it is a Paytm statement. "
+            "Please make sure it is a supported statement. "
             "For other banks please upload Excel format."
         )
         st.stop()
@@ -97,8 +140,9 @@ elif file_name.endswith(".xlsx") or file_name.endswith(".xls"):
         st.success(f"Successfully parsed {len(df)} transactions!")
     except Exception as e:
         st.error(
-            "❌ Could not parse this Excel file. "
-            "Please make sure it is a valid bank statement."
+            "❌ Could not parse this PDF. "
+            "Please make sure it is a supported statement. "
+            "For other banks please upload Excel format."
         )
         st.stop()
 
@@ -122,9 +166,6 @@ if "Amount" not in df.columns:
         "Please DM us on Instagram @nitinbuilds.official "
         "with your bank name and we will add support within 48 hours."
     )
-    st.stop()
-
-if df.empty:
     st.stop()
 
 # ─────────────────────────────────────────
